@@ -58,6 +58,17 @@ Parameters:
     AllowedPattern: '[a-zA-Z0-9]*'
     ConstraintDescription: >-
       must contain only alphanumeric characters. (8 to 20 characters)
+  Hostname:
+    Description: Database Endpoint
+    Type: String
+    Default: localhost
+    ConstraintDescription: Endpoint of the MYSQL DB
+  DBPort:
+      Description: Database Endpoint Port
+      Type: String
+      Default: '3306'
+      ConstraintDescription: Endpoint  port for MYSQL DB
+
 Mappings:
   AWSInstanceType2Arch:
     t2.micro:
@@ -220,7 +231,6 @@ Resources:
             - install_chefdk
             - install_chef
             - install_wordpress
-            - configure_wordpress
             - run_chef
         install_cfn:
           files:
@@ -247,12 +257,9 @@ Resources:
                     [cfn-auto-reloader-hook]
                   - |
                     triggers=post.update
-                  - |
-                    path=Resources.WebServer.Metadata.AWS::CloudFormation::Init
                   - 'action=/opt/aws/bin/cfn-init -v '
                   - '         --stack '
                   - !Ref 'AWS::StackName'
-                  - '         --resource WebServer '
                   - '         --configsets wordpress_install '
                   - '         --region '
                   - !Ref 'AWS::Region'
@@ -269,11 +276,6 @@ Resources:
                 files:
                   - /etc/cfn/cfn-hup.conf
                   - /etc/cfn/hooks.d/cfn-auto-reloader.conf
-        install_chefdk:
-          packages:
-            rpm:
-              chefdk: >-
-                https://opscode-omnibus-packages.s3.amazonaws.com/el/6/x86_64/chefdk-0.2.0-2.el6.x86_64.rpm
         install_chef:
           sources:
             /var/chef/chef-repo: 'http://github.com/opscode/chef-repo/tarball/master'
@@ -314,105 +316,89 @@ Resources:
               cwd: /var/chef/chef-repo
               env:
                 HOME: /var/chef
-        install_wordpress:
+        install_chefdk:
           packages:
-            yum:
-              php: []
-              php-mysql: []
-              mysql: []
-              mysql-server: []
-              mysql-devel: []
-              mysql-libs: []
-              httpd: []
-          sources:
-            /var/www/html: 'http://wordpress.org/latest.tar.gz'
+            rpm:
+              chefdk: >-
+                https://opscode-omnibus-packages.s3.amazonaws.com/el/6/x86_64/chefdk-0.2.0-2.el6.x86_64.rpm
+        install_wordpress:
           files:
-            /tmp/setup.mysql:
+            /var/chef/chef-repo/.chef/knife.rb:
               content: !Join
                 - ''
-                - - 'CREATE DATABASE '
-                  - !Ref DBName
+                - - >
+                    cookbook_path [
+                    '/var/chef/chef-repo/cookbooks/wordpress/berks-cookbooks' ]
                   - |
-                    ;
-                  - CREATE USER '
-                  - !Ref DBUser
-                  - '''@''localhost'' IDENTIFIED BY '''
-                  - !Ref DBPassword
-                  - |
-                    ';
-                  - 'GRANT ALL ON '
-                  - !Ref DBName
-                  - .* TO '
-                  - !Ref DBUser
-                  - |
-                    '@'localhost';
-                  - |
-                    FLUSH PRIVILEGES;
+                    node_path [ '/var/chef/chef-repo/nodes' ]
               mode: '000400'
               owner: root
               group: root
-            /tmp/create-wp-config:
+            /var/chef/chef-repo/.chef/client.rb:
               content: !Join
                 - ''
-                - - |
-                    #!/bin/bash -xe
-                  - >
-                    cp /var/www/html/wordpress/wp-config-sample.php
-                    /var/www/html/wordpress/wp-config.php
-                  - sed -i "s/'database_name_here'/'
-                  - !Ref DBName
+                - - >
+                    cookbook_path [
+                    '/var/chef/chef-repo/cookbooks/wordpress/berks-cookbooks' ]
                   - |
-                    '/g" wp-config.php
-                  - sed -i "s/'username_here'/'
-                  - !Ref DBUser
-                  - |
-                    '/g" wp-config.php
-                  - sed -i "s/'password_here'/'
-                  - !Ref DBPassword
-                  - |
-                    '/g" wp-config.php
-              mode: '000500'
+                    node_path [ '/var/chef/chef-repo/nodes' ]
+              mode: '000400'
               owner: root
               group: root
-          services:
-            sysvinit:
-              httpd:
-                enabled: 'true'
-                ensureRunning: 'true'
-              mysqld:
-                enabled: 'true'
-                ensureRunning: 'true'
-        configure_wordpress:
+            /var/chef/chef-repo/cookbooks/wordpress/attributes/default.rb:
+              content: !Join
+                - ''
+                - - 'node[''wordpress''][''db''][''pass''] = '''
+                  - !Ref DBPassword
+                  - |
+                    '
+                  - 'node[''wordpress''][''db''][''user''] = '''
+                  - !Ref DBUser
+                  - |
+                    '
+                  - 'node[''wordpress''][''db''][''host''] = '''
+                  - !Ref WPDbServer
+                  - |
+                    '
+                  - 'node[''wordpress''][''db''][''port''] = '''
+                  - !Ref DBPort
+                  - |
+                    '
+                  - 'normal[''wordpress''][''db''][''name''] = '''
+                  - !Ref DBName
+                  - |
+                    '
+              mode: '000400'
+              owner: root
+              group: root
           commands:
-            01_set_mysql_root_password:
-              command: !Join
-                - ''
-                - - mysqladmin -u root password '
-                  - !Ref DBRootPassword
-                  - ''''
-              test: !Join
-                - ''
-                - - '$(mysql '
-                  - !Ref DBName
-                  - ' -u root --password='''
-                  - !Ref DBRootPassword
-                  - ''' >/dev/null 2>&1 </dev/null); (( $? != 0 ))'
-            02_create_database:
-              command: !Join
-                - ''
-                - - mysql -u root --password='
-                  - !Ref DBRootPassword
-                  - ''' < /tmp/setup.mysql'
-              test: !Join
-                - ''
-                - - '$(mysql '
-                  - !Ref DBName
-                  - ' -u root --password='''
-                  - !Ref DBRootPassword
-                  - ''' >/dev/null 2>&1 </dev/null); (( $? != 0 ))'
-            03_configure_wordpress:
-              command: /tmp/create-wp-config
-              cwd: /var/www/html/wordpress
+            01_get_cookbook:
+              command: knife cookbook site download wordpress 2.3.0
+              cwd: /var/chef/chef-repo
+              env:
+                HOME: /var/chef
+            02_unpack_cookbook:
+              command: tar xvfz /var/chef/chef-repo/wordpress*
+              cwd: /var/chef/chef-repo/cookbooks
+            03_init_berkshelf:
+              command: >-
+                berks init /var/chef/chef-repo/cookbooks/wordpress
+                --skip-vagrant --skip-git
+              cwd: /var/chef/chef-repo/cookbooks/wordpress
+              env:
+                HOME: /var/chef
+            04_vendorize_berkshelf:
+              command: berks vendor
+              cwd: /var/chef/chef-repo/cookbooks/wordpress
+              env:
+                HOME: /var/chef
+            05_configure_node_run_list:
+              command: >-
+                knife node run_list add -z `knife node list -z`
+                recipe[wordpress]
+              cwd: /var/chef/chef-repo
+              env:
+                HOME: /var/chef
         run_chef:
           commands:
             01_run_chef_client:
@@ -457,9 +443,6 @@ Resources:
             - |+
       SubnetId: !Ref ikPublicSubnet
 
-    CreationPolicy:
-      ResourceSignal:
-        Timeout: PT15M
   WPDbSecurityGroup:
       Type: 'AWS::EC2::SecurityGroup'
       Properties:
@@ -470,30 +453,26 @@ Resources:
             FromPort: '3306'
             ToPort: '3306'
             SourceSecurityGroupId: !Ref WebServerSecurityGroup
-          - IpProtocol: tcp
-            FromPort: '22'
-            ToPort: '22'
-            SourceSecurityGroupId: !Ref WebServerSecurityGroup
+        #  - IpProtocol: tcp
+        #    FromPort: '22'
+        #    ToPort: '22'
+        #    SourceSecurityGroupId: !Ref WebServerSecurityGroup
         VpcId: !Ref IshanVPC
   WPDbServer:
     Type: 'AWS::EC2::Instance'
     Metadata:
       'AWS::CloudFormation::Init':
         configSets:
-          wordpress_install:
+          wordpressdb_install:
             - install_wordpress
             - configure_wordpress
-            - run_chef
         install_wordpress:
           packages:
             yum:
-              php: []
-              php-mysql: []
               mysql: []
               mysql-server: []
               mysql-devel: []
               mysql-libs: []
-              httpd: []
           sources:
             /var/www/html: 'http://wordpress.org/latest.tar.gz'
           files:
@@ -521,34 +500,8 @@ Resources:
               mode: '000400'
               owner: root
               group: root
-            /tmp/create-wp-config:
-              content: !Join
-                - ''
-                - - |
-                    #!/bin/bash -xe
-                  - >
-                    cp /var/www/html/wordpress/wp-config-sample.php
-                    /var/www/html/wordpress/wp-config.php
-                  - sed -i "s/'database_name_here'/'
-                  - !Ref DBName
-                  - |
-                    '/g" wp-config.php
-                  - sed -i "s/'username_here'/'
-                  - !Ref DBUser
-                  - |
-                    '/g" wp-config.php
-                  - sed -i "s/'password_here'/'
-                  - !Ref DBPassword
-                  - |
-                    '/g" wp-config.php
-              mode: '000500'
-              owner: root
-              group: root
           services:
             sysvinit:
-              httpd:
-                enabled: 'true'
-                ensureRunning: 'true'
               mysqld:
                 enabled: 'true'
                 ensureRunning: 'true'
@@ -580,16 +533,6 @@ Resources:
                   - ' -u root --password='''
                   - !Ref DBRootPassword
                   - ''' >/dev/null 2>&1 </dev/null); (( $? != 0 ))'
-            03_configure_wordpress:
-              command: /tmp/create-wp-config
-              cwd: /var/www/html/wordpress
-        run_chef:
-          commands:
-            01_run_chef_client:
-              command: chef-client -z -c /var/chef/chef-repo/.chef/client.rb
-              cwd: /var/chef/chef-repo
-              env:
-                HOME: /var/chef
     Properties:
       ImageId: !FindInMap
         - AWSRegionArch2AMI
@@ -613,7 +556,7 @@ Resources:
             - '         --stack '
             - !Ref 'AWS::StackName'
             - '         --resource WPDbServer '
-            - '         --configsets wordpress_install '
+            - '         --configsets wordpressdb_install '
             - '         --region '
             - !Ref 'AWS::Region'
             - |+
@@ -621,13 +564,17 @@ Resources:
             - '/opt/aws/bin/cfn-signal -e $? '
             - '         --stack '
             - !Ref 'AWS::StackName'
-            - '         --resource WebServer '
+            - '         --resource WPDbServer '
             - '         --region '
             - !Ref 'AWS::Region'
             - |+
       SubnetId: !Ref ikPrivateSubnet
 
     CreationPolicy:
+      ResourceSignal:
+        Timeout: PT15M
+
+CreationPolicy:
       ResourceSignal:
         Timeout: PT15M
 Outputs:
