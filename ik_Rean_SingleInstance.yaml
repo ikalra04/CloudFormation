@@ -456,10 +456,6 @@ Resources:
             - !Ref 'AWS::Region'
             - |+
       SubnetId: !Ref ikPublicSubnet
-
-    CreationPolicy:
-      ResourceSignal:
-        Timeout: PT15M
 Outputs:
   VPCID:
     Value: !Ref IshanVPC

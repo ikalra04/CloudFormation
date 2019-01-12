@@ -68,7 +68,6 @@ Parameters:
       Type: String
       Default: '3306'
       ConstraintDescription: Endpoint  port for MYSQL DB
-
 Mappings:
   AWSInstanceType2Arch:
     t2.micro:
@@ -442,7 +441,6 @@ Resources:
             - !Ref 'AWS::Region'
             - |+
       SubnetId: !Ref ikPublicSubnet
-
   WPDbSecurityGroup:
       Type: 'AWS::EC2::SecurityGroup'
       Properties:
@@ -569,14 +567,6 @@ Resources:
             - !Ref 'AWS::Region'
             - |+
       SubnetId: !Ref ikPrivateSubnet
-
-    CreationPolicy:
-      ResourceSignal:
-        Timeout: PT15M
-
-CreationPolicy:
-      ResourceSignal:
-        Timeout: PT15M
 Outputs:
   VPCID:
     Value: !Ref IshanVPC
