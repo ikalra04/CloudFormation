@@ -25,6 +25,7 @@ ik_Rean_SeparateDBInstance.yaml (Partially successful): This template will :
   3. 1 webserver instance in public subnet and 1 DB server instance in private subnet.
   4. The web server instance will have the Chef and Wordpress website configured and the DB server will have mysql installation as a wordpress database.
   5. Outputs section will display the website URL.
+
 Note: The CF stack will create successfully. The wordpress website is not launching as I am unable to figure out the recipes which can automate the configuration of the mysql DB server for Wordpress website. I was able to achieve this using RDS by modifying amazon sample template, but in the candidate account the RDS access IAM policy is not assigned.
 
 # Usage
