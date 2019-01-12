@@ -29,7 +29,12 @@ Note: The CF stack will create successfully. The wordpress website is not launch
 
 # Usage
 
-The templates can be executed by using below AWS CLI command :
+The templates can be executed by :
+
+1. Using the Cloud formation service my providing the below S3 URL or by uploading the template file
+   - https://s3-us-west-2.amazonaws.com/ik-rean-bucket/ik_Rean_SingleInstance.yaml
+
+2. using below AWS CLI command :
 
 aws cloudformation create-stack --stack-name ik-Rean-Stack --template-url https://s3-us-west-2.amazonaws.com/ik-rean-bucket/ik_Rean_SingleInstance.yaml --parameters  ParameterKey=DBName,ParameterValue=wordpressdb ParameterKey=DBPassword,ParameterValue=admin123 ParameterKey=DBRootPassword,ParameterValue=admin123 ParameterKey=DBUser,ParameterValue=admin ParameterKey=InstanceType,ParameterValue=t2.micro ParameterKey=KeyName,ParameterValue=ik-Rean_Oregon ParameterKey=SSHLocation,ParameterValue=10.0.0.240/32
 
