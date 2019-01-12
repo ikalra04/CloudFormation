@@ -1,8 +1,8 @@
 # CloudFormation
+
 My CloudFormation Templates
 
 # Objective
-
 Use CM tools such as Puppet, Ansible, or Chef to automate the installation of basic Drupal or WordPress. Setup a sample site. Automate the solution using Cloudformation template.
 
 # Deliverable
